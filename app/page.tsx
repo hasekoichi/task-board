@@ -3,9 +3,18 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
+// Supabase クライアント初期化
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+type Task = {
+  id: string
+  title: string
+  is_completed: boolean
+  user_id: string
+  created_at: string
+}
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
@@ -15,22 +24,104 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
 
+  // タスク管理用のステート
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+
   useEffect(() => {
+    // ユーザー情報の取得と認証状態の監視
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+      if (user) {
+        fetchTasks(user.id)
+      }
       setLoading(false)
     }
     checkUser()
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+      if (currentUser) {
+        fetchTasks(currentUser.id)
+      } else {
+        setTasks([])
+      }
     })
 
     return () => {
       authListener.subscription.unsubscribe()
     }
   }, [])
+
+  // タスク一覧を取得
+  const fetchTasks = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('タスク取得エラー:', error.message)
+    } else {
+      setTasks(data || [])
+    }
+  }
+
+  // タスク追加
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTaskTitle.trim() || !user) return
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([
+        {
+          title: newTaskTitle.trim(),
+          is_completed: false,
+          user_id: user.id,
+        },
+      ])
+      .select()
+
+    if (error) {
+      alert(`タスク追加エラー: ${error.message}`)
+    } else if (data) {
+      setTasks([data[0], ...tasks])
+      setNewTaskTitle('')
+    }
+  }
+
+  // タスク完了ステータス切り替え
+  const handleToggleComplete = async (taskId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ is_completed: !currentStatus })
+      .eq('id', taskId)
+
+    if (error) {
+      alert(`更新エラー: ${error.message}`)
+    } else {
+      setTasks(
+        tasks.map((task) =>
+          task.id === taskId ? { ...task, is_completed: !currentStatus } : task
+        )
+      )
+    }
+  }
+
+  // タスク削除
+  const handleDeleteTask = async (taskId: string) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+
+    if (error) {
+      alert(`削除エラー: ${error.message}`)
+    } else {
+      setTasks(tasks.filter((task) => task.id !== taskId))
+    }
+  }
 
   // Google ログイン処理
   const handleGoogleLogin = async () => {
@@ -88,25 +179,94 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-6">
+    <main className="min-h-screen bg-slate-50 p-4 md:p-8 flex justify-center">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-6 md:p-8 space-y-6 self-start mt-6">
         {user ? (
-          <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
-              📌 タスクボード
-            </h1>
-            <p className="text-sm text-slate-600">
-              ログイン中: <span className="font-semibold text-slate-800">{user.email}</span>
-            </p>
-            <button
-              onClick={handleLogout}
-              className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow transition duration-200"
-            >
-              ログアウト
-            </button>
+          /* ログイン後：タスク管理画面 */
+          <div className="space-y-6">
+            {/* ヘッダー */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-slate-100">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  📌 タスクボード
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">
+                  ログイン中: <span className="font-semibold text-slate-700">{user.email}</span>
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 font-medium text-xs rounded-xl transition duration-200 border border-slate-200 hover:border-red-200"
+              >
+                ログアウト
+              </button>
+            </div>
+
+            {/* 新規タスク追加フォーム */}
+            <form onSubmit={handleAddTask} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="新しいタスクを入力..."
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm bg-slate-50/50"
+              />
+              <button
+                type="submit"
+                className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow transition duration-200 text-sm whitespace-nowrap"
+              >
+                追加
+              </button>
+            </form>
+
+            {/* タスク一覧 */}
+            <div className="space-y-3 pt-2">
+              <h2 className="text-sm font-semibold text-slate-500">タスク一覧 ({tasks.length})</h2>
+
+              {tasks.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-sm bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  タスクがありません。上のフォームから追加してください！
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {tasks.map((task) => (
+                    <li
+                      key={task.id}
+                      className="flex items-center justify-between p-4 bg-slate-50 hover:bg-amber-50/30 rounded-xl border border-slate-100 transition duration-150 group"
+                    >
+                      <div className="flex items-center gap-3 flex-1 mr-2">
+                        <input
+                          type="checkbox"
+                          checked={task.is_completed}
+                          onChange={() => handleToggleComplete(task.id, task.is_completed)}
+                          className="w-5 h-5 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
+                        />
+                        <span
+                          className={`text-sm font-medium ${
+                            task.is_completed
+                              ? 'line-through text-slate-400'
+                              : 'text-slate-700'
+                          }`}
+                        >
+                          {task.title}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition duration-150"
+                        title="削除"
+                      >
+                        🗑️
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          /* ログアウト時：ログインフォーム */
+          <div className="space-y-6 max-w-md mx-auto">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
                 📌 タスクボード
