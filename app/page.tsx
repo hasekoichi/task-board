@@ -9,6 +9,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
 
@@ -43,34 +44,32 @@ export default function Home() {
     }
   }
 
-  // メールアドレス ログイン処理
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  // メールアドレス ログイン/新規登録処理
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage('')
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) {
-      setMessage(`エラー: ${error.message}`)
-    }
-  }
 
-  // メールアドレス 新規登録処理
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMessage('')
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-    if (error) {
-      setMessage(`エラー: ${error.message}`)
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      if (error) {
+        setMessage(`エラー: ${error.message}`)
+      } else {
+        setMessage('確認メールを送信しました。メールをご確認ください。')
+      }
     } else {
-      setMessage('確認メールを送信しました。メールをご確認ください。')
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) {
+        setMessage(`エラー: ${error.message}`)
+      }
     }
   }
 
@@ -81,24 +80,26 @@ export default function Home() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">読み込み中...</p>
+      <main className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-gray-500 font-medium">読み込み中...</p>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+    <main className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-6">
         {user ? (
           <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold text-gray-900">Task Board</h1>
-            <p className="text-sm text-gray-600">
-              ログイン中: <span className="font-semibold text-gray-800">{user.email}</span>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+              📌 タスクボード
+            </h1>
+            <p className="text-sm text-slate-600">
+              ログイン中: <span className="font-semibold text-slate-800">{user.email}</span>
             </p>
             <button
               onClick={handleLogout}
-              className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition"
+              className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow transition duration-200"
             >
               ログアウト
             </button>
@@ -106,12 +107,13 @@ export default function Home() {
         ) : (
           <div className="space-y-6">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-gray-900">ログイン / 新規登録</h1>
-              <p className="text-sm text-gray-500 mt-1">Task Board へアクセス</p>
+              <h1 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                📌 タスクボード
+              </h1>
             </div>
 
             {message && (
-              <div className="p-3 text-sm rounded bg-blue-50 text-blue-700 border border-blue-200">
+              <div className="p-3 text-sm rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-center">
                 {message}
               </div>
             )}
@@ -120,7 +122,7 @@ export default function Home() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className="w-full py-2.5 px-4 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-3 transition"
+              className="w-full py-3 px-4 bg-white border border-gray-300 rounded-xl shadow-sm text-sm font-bold text-slate-700 hover:bg-gray-50 flex items-center justify-center gap-3 transition duration-200"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -145,53 +147,56 @@ export default function Home() {
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+                <div className="w-full border-t border-slate-200"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">または</span>
+                <span className="bg-white px-2 text-slate-400">または</span>
               </div>
             </div>
 
-            {/* メールアドレス ログインフォーム */}
-            <form className="space-y-4">
+            {/* メール/パスワード フォーム */}
+            <form onSubmit={handleAuth} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">メールアドレス</label>
                 <input
                   type="email"
+                  placeholder="メールアドレス"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm bg-slate-50/50"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">パスワード</label>
                 <input
                   type="password"
+                  placeholder="パスワード"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm bg-slate-50/50"
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleEmailLogin}
-                  className="w-1/2 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md text-sm transition"
-                >
-                  ログイン
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSignUp}
-                  className="w-1/2 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-md text-sm transition"
-                >
-                  新規登録
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow transition duration-200 text-sm"
+              >
+                {isSignUp ? 'アカウント作成' : 'ログイン'}
+              </button>
             </form>
+
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp)
+                  setMessage('')
+                }}
+                className="text-xs text-slate-500 hover:underline"
+              >
+                {isSignUp ? 'すでにアカウントをお持ちの場合はこちら' : 'アカウントを作成する場合はこちら'}
+              </button>
+            </div>
           </div>
         )}
       </div>
