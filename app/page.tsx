@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { User } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function Home() {
-  const supabase = createClientComponentClient()
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<any>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
@@ -14,12 +16,12 @@ export default function Home() {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    const getUser = async () => {
+    const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
       setLoading(false)
     }
-    getUser()
+    checkUser()
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
@@ -28,7 +30,7 @@ export default function Home() {
     return () => {
       authListener.subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [])
 
   // Google ログイン処理
   const handleGoogleLogin = async () => {
@@ -44,7 +46,7 @@ export default function Home() {
     }
   }
 
-  // メールアドレス ログイン/新規登録処理
+  // メール/パスワード ログイン・新規登録
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage('')
@@ -60,7 +62,7 @@ export default function Home() {
       if (error) {
         setMessage(`エラー: ${error.message}`)
       } else {
-        setMessage('確認メールを送信しました。メールをご確認ください。')
+        setMessage('確認メールを送信しました。')
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
@@ -73,7 +75,6 @@ export default function Home() {
     }
   }
 
-  // ログアウト処理
   const handleLogout = async () => {
     await supabase.auth.signOut()
   }
@@ -154,7 +155,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* メール/パスワード フォーム */}
             <form onSubmit={handleAuth} className="space-y-4">
               <div>
                 <input
