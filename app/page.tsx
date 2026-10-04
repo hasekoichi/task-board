@@ -35,6 +35,7 @@ export default function Home() {
   const [selectedMatrix, setSelectedMatrix] = useState<MatrixType>('do_first');
   const [selectedColor, setSelectedColor] = useState<StickyColor>('yellow');
   const [dueDate, setDueDate] = useState('');
+  const [isNoDeadline, setIsNoDeadline] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -96,9 +97,9 @@ export default function Home() {
       subject: subject.trim() || null,
       description: description || null,
       is_completed: false,
-      matrix_type: selectedMatrix,
+      matrix_type: selectedMatrix, // ユーザーが選んだ象限をそのまま使用
       color: selectedColor,
-      due_date: dueDate || null,
+      due_date: isNoDeadline ? null : (dueDate || null),
     };
 
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
@@ -114,6 +115,7 @@ export default function Home() {
       setSubject('');
       setDescription('');
       setDueDate('');
+      setIsNoDeadline(false);
     }
   };
 
@@ -305,12 +307,29 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">提出期限</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-600">提出期限</label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isNoDeadline}
+                    onChange={(e) => {
+                      setIsNoDeadline(e.target.checked);
+                      if (e.target.checked) setDueDate('');
+                    }}
+                    className="w-3.5 h-3.5 accent-amber-500 rounded"
+                  />
+                  <span>無期限（期限なし）</span>
+                </label>
+              </div>
               <input
                 type="date"
                 value={dueDate}
+                disabled={isNoDeadline}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full p-2 text-sm border border-slate-300 rounded-lg outline-none"
+                className={`w-full p-2 text-sm border border-slate-300 rounded-lg outline-none transition ${
+                  isNoDeadline ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'
+                }`}
               />
             </div>
 
@@ -429,10 +448,14 @@ export default function Home() {
                                       </div>
                                     </div>
 
-                                    {task.due_date && (
+                                    {task.due_date ? (
                                       <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-white/60 px-2 py-0.5 rounded w-fit">
                                         <CalendarIcon size={12} />
                                         <span>締切: {task.due_date}</span>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-slate-400 bg-slate-100/80 px-2 py-0.5 rounded w-fit">
+                                        <span>期限なし</span>
                                       </div>
                                     )}
                                   </div>
